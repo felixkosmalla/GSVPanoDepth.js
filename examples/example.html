@@ -4,16 +4,107 @@
     <meta http-equiv="content-type" content="text/html; charset=UTF-8"/> 
     <title>Example</title> 
 
+    <style type="text/css">
+    #map-canvas{
+        width:auto;
+        height:400px;
+    }
+    </style>
+
     <script src="https://maps.googleapis.com/maps/api/js?v=3.exp&sensor=false" type="text/javascript"></script> 
     <script src="js/jquery.min.js" type="text/javascript"></script>
     <script src="js/jquery.base64.min.js" type="text/javascript"></script>
     <script src="js/zpipe.min.js" type="text/javascript"></script>
     <script src="js/GSVPano.js" type="text/javascript"></script>
     <script src="../src/GSVPanoDepth.js" type="text/javascript"></script>
+
+
     <script>
+
+
+        var markers = [];
+        var map  = false;
+
+        function placeMarker(location, map) {
+            var clickedLocation = new google.maps.LatLng(location);
+            var marker = new google.maps.Marker({
+                position: location,
+                map: map,
+                draggable: true
+            });
+
+            return marker;
+        }
+
+
+        function getMarkers(){
+            var res_markers = [];
+
+            for(i = 0; i < markers.length; i++){
+                
+                if(markers[i].getMap() != null){
+                    res_markers.push(markers[i]);
+                }
+            }
+
+            return res_markers;
+        }
+
+
+
+        function initialize() {
+
+            var mapOptions = {
+              center: new google.maps.LatLng(42.345601, -71.098348),
+              zoom: 15
+            };
+            
+            map = new google.maps.Map(document.getElementById("map-canvas"), mapOptions);
+
+            google.maps.event.addListener(map, 'click', function(event) {
+                var marker = placeMarker(event.latLng, map);
+                markers.push(marker);
+
+                google.maps.event.addListener(marker, 'dblclick', function(event){
+                    marker.setMap(null);
+                });
+            });
+        
+        }
+
+        google.maps.event.addDomListener(window, 'load', initialize);
+
+
+        var _panoLoader = null;
+        var _depthLoader = null;
+
+        var depth_data = [];
+
+        var next_marker = false;
+
+        var current_pano_image = false;
+
+
+        var marker_queue = [];
+
+   
+
+        function afterLoad(){
+            
+            if(marker_queue.length > 0){
+                next_marker = marker_queue.pop();
+                _panoLoader.load(next_marker.getPosition());  
+            }else{
+                var j = JSON.stringify(depth_data);
+                $('#json_stuff').val(j);
+            }
+        }
+
+
         function init() {
-            var _panoLoader = new GSVPANO.PanoLoader({zoom: 1});
-            var _depthLoader = new GSVPANO.PanoDepthLoader();
+            
+            _panoLoader = new GSVPANO.PanoLoader({zoom: 1});
+            _depthLoader = new GSVPANO.PanoDepthLoader();
 
             _depthLoader.onDepthLoad = function() {
                 var x, y, canvas, context, image, w, h, c;
@@ -29,8 +120,18 @@
                 
                 image = context.getImageData(0, 0, w, h);
 
+
+                var depthmap = [];
+
                 for(y=0; y<h; ++y) {
                     for(x=0; x<w; ++x) {
+
+                        if(depthmap[x] == null){
+                            depthmap[x] = [];
+                        }
+
+                        depthmap[x][y] = this.depthMap.depthMap[y*w + x];
+                        
                         c = this.depthMap.depthMap[y*w + x] / 50 * 255;
                         image.data[4*(y*w + x)    ] = c;
                         image.data[4*(y*w + x) + 1] = c;
@@ -39,24 +140,76 @@
                     }
                 }
 
+                depth_loaded = true;
+
+                console.log(depthmap);
+
+
+
                 context.putImageData(image, 0, 0);
 
                 gDepthMap = this.depthMap;
 
-                document.body.appendChild(canvas);
+                document.getElementById("map-results").appendChild(canvas);
+
+
+                //// write data in array
+                var current_data = {};
+                var ll = next_marker.getPosition();
+                current_data['lat'] = ll.lat();
+                current_data['lng'] = ll.lng();
+                // current_data['depth_data'] = depthmap;
+                current_data['pano_image'] = current_pano_image.toDataURL();
+
+                depth_data.push(current_data);
+
+
+                afterLoad();
             }
 
             _panoLoader.onPanoramaLoad = function() {
-                document.body.appendChild(this.canvas);
+                document.getElementById("map-results").innerHTML = "";
+                document.getElementById("map-results").appendChild(this.canvas);
+                current_pano_image = this.canvas;
                 _depthLoader.load(this.panoId);
             };
 
-            _panoLoader.load(new google.maps.LatLng(42.345601, -71.098348));
+            
         }
 
         window.onload = init;
+
+
+
+        $(function(){
+
+            $('#start-download').click(function(){
+                var selected_markers = getMarkers();
+
+                if(selected_markers){
+                    marker_queue = selected_markers;
+                
+                    afterLoad();
+                    
+
+
+                }
+
+               
+            });
+
+        });
     </script> 
 </head> 
 <body> 
+
+<div id="map-canvas"></div>
+<button id='start-download'>start!</button>
+<div id="map-results">images</div>
+<div id="content">
+    
+    <textarea id="json_stuff" cols="100" rows="100"></textarea>
+
+</div>
 </body> 
 </html>
