@@ -9,6 +9,28 @@
         width:auto;
         height:400px;
     }
+
+    .result-box{
+        border:1px solid #ccc;
+        margin:20px;
+        float:none;
+        clear:both;
+
+    }
+
+    .result-box        input{
+        width:200px;
+    }
+
+    .result-box img{
+        float:left;
+    }
+
+
+
+
+
+
     </style>
 
     <script src="https://maps.googleapis.com/maps/api/js?v=3.exp&sensor=false" type="text/javascript"></script> 
@@ -95,9 +117,37 @@
                 next_marker = marker_queue.pop();
                 _panoLoader.load(next_marker.getPosition());  
             }else{
-                var j = JSON.stringify(depth_data);
-                $('#json_stuff').val(j);
+                document.getElementById("map-results").innerHTML = "";
             }
+        }
+
+        function addResult(res){
+            var r_dd = JSON.stringify(res['depth_data']);
+            var r_lat = res.lat;
+            var r_lng = res.lng;
+            var r_pano_src = res.pano_image;
+
+            var div = document.createElement("div");
+            $(div).addClass('result-box');
+            var div_j = $(div);
+            $('#content').append(div);
+            var img = document.createElement("img");
+            img.src = r_pano_src;
+            div_j.append(img);
+            var inp = document.createElement("input");
+
+            inp.value = r_lat+", "+r_lng;
+            div_j.append(inp);
+
+            var br = document.createElement("br");
+            div_j.append(br);
+            var txt = document.createElement("textarea")
+            txt.cols = 50;
+            txt.rows= 20;
+            $(txt).val(r_dd);
+            $(div).append(txt);
+
+
         }
 
 
@@ -142,7 +192,7 @@
 
                 depth_loaded = true;
 
-                console.log(depthmap);
+
 
 
 
@@ -158,10 +208,10 @@
                 var ll = next_marker.getPosition();
                 current_data['lat'] = ll.lat();
                 current_data['lng'] = ll.lng();
-                // current_data['depth_data'] = depthmap;
+                current_data['depth_data'] = depthmap;
                 current_data['pano_image'] = current_pano_image.toDataURL();
 
-                depth_data.push(current_data);
+                addResult(current_data);
 
 
                 afterLoad();
@@ -208,7 +258,7 @@
 <div id="map-results">images</div>
 <div id="content">
     
-    <textarea id="json_stuff" cols="100" rows="100"></textarea>
+    
 
 </div>
 </body> 
